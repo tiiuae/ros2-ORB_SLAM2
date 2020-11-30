@@ -17,26 +17,31 @@ find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(message_filters REQUIRED)
-find_package(Pangolin REQUIRED)
+#find_package(Pangolin REQUIRED)
 find_package(ORB_SLAM2 REQUIRED)
+find_package(Eigen3 3.1.0 REQUIRED)
+
+include_directories(
+${EIGEN3_INCLUDE_DIR}
+)
 
 add_executable(mono 
   src/monocular/mono.cpp
   src/monocular/monocular-slam-node.cpp
 )
-ament_target_dependencies(mono rclcpp sensor_msgs cv_bridge ORB_SLAM2 Pangolin)
+ament_target_dependencies(mono rclcpp sensor_msgs cv_bridge ORB_SLAM2)
 
 add_executable(rgbd 
   src/rgbd/rgbd.cpp
   src/rgbd/rgbd-slam-node.cpp
 )
-ament_target_dependencies(rgbd rclcpp sensor_msgs cv_bridge message_filters ORB_SLAM2 Pangolin)
+ament_target_dependencies(rgbd rclcpp sensor_msgs cv_bridge message_filters ORB_SLAM2)
 
 add_executable(stereo 
   src/stereo/stereo.cpp
   src/stereo/stereo-slam-node.cpp
 )
-ament_target_dependencies(stereo rclcpp sensor_msgs cv_bridge message_filters ORB_SLAM2 Pangolin)
+ament_target_dependencies(stereo rclcpp sensor_msgs cv_bridge message_filters ORB_SLAM2)
 
 install(TARGETS mono rgbd stereo
   DESTINATION lib/${PROJECT_NAME})
