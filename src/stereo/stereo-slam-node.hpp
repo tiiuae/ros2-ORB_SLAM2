@@ -15,6 +15,7 @@
 #include "Map.h"
 #include "Tracking.h"
 
+namespace ORB_SLAM2 = ORB_SLAM3;
 
 class StereoSlamNode : public rclcpp::Node
 {

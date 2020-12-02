@@ -21,6 +21,8 @@
 #include "Map.h"
 #include "Tracking.h"
 
+namespace ORB_SLAM2=ORB_SLAM3;
+
 class RgbdSlamNode : public rclcpp::Node
 {
 public:
