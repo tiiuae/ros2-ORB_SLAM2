@@ -25,6 +25,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(message_filters REQUIRED)
 find_package(Eigen3 3.1.0 REQUIRED)
+find_package(Pangolin REQUIRED)
 
 include_directories(
   ${EIGEN3_INCLUDE_DIR}
@@ -49,7 +50,7 @@ add_executable(mono
 )
 
 add_dependencies(mono orb_slam)
-ament_target_dependencies(mono rclcpp sensor_msgs cv_bridge)
+ament_target_dependencies(mono rclcpp sensor_msgs cv_bridge Pangolin)
 target_link_libraries(mono ${ORB_SLAM} ${G2O})
 
 add_executable(rgbd 
@@ -58,7 +59,7 @@ add_executable(rgbd
 )
 
 add_dependencies(rgbd orb_slam)
-ament_target_dependencies(rgbd rclcpp sensor_msgs cv_bridge message_filters)
+ament_target_dependencies(rgbd rclcpp sensor_msgs cv_bridge message_filters Pangolin)
 target_link_libraries(rgbd ${ORB_SLAM} ${G2O})
 
 add_executable(stereo 
@@ -67,7 +68,7 @@ add_executable(stereo
 )
 
 add_dependencies(stereo orb_slam)
-ament_target_dependencies(stereo rclcpp sensor_msgs cv_bridge message_filters)
+ament_target_dependencies(stereo rclcpp sensor_msgs cv_bridge message_filters Pangolin)
 target_link_libraries(stereo ${ORB_SLAM} ${G2O})
 
 install(TARGETS mono rgbd stereo
