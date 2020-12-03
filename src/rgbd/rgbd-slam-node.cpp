@@ -6,7 +6,7 @@ using std::placeholders::_1;
 
 RgbdSlamNode::RgbdSlamNode(ORB_SLAM2::System* pSLAM)
 :   Node("orbslam"),
-    m_SLAM(pSLAM)
+    m_SLAM(pSLAM), publisher(std::make_shared<VIOPublisher>(this))
 {
     rgb_sub = std::make_shared<message_filters::Subscriber<ImageMsg> >(shared_ptr<rclcpp::Node>(this), "camera/rgb");
     depth_sub = std::make_shared<message_filters::Subscriber<ImageMsg> >(shared_ptr<rclcpp::Node>(this), "camera/depth");
@@ -50,4 +50,8 @@ void RgbdSlamNode::GrabRGBD(const ImageMsg::SharedPtr msgRGB, const ImageMsg::Sh
     }
     
     cv::Mat Tcw = m_SLAM->TrackRGBD(cv_ptrRGB->image, cv_ptrD->image, msgRGB->header.stamp.sec);
+
+    if (!Tcw.empty()) {
+        publisher->PublishVIO(Tcw, msgRGB->header.stamp);
+    }
 }

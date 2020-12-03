@@ -2,12 +2,14 @@
 
 #include<opencv2/core/core.hpp>
 
+#include "vio_publisher.hpp"
+
 using std::placeholders::_1;
 using std::placeholders::_2;
 
 StereoSlamNode::StereoSlamNode(ORB_SLAM2::System* pSLAM, const string &strSettingsFile, const string &strDoRectify)
 :   Node("orbslam"),
-    m_SLAM(pSLAM)
+    m_SLAM(pSLAM), publisher(std::make_shared<VIOPublisher>(this))
 {
     stringstream ss(strDoRectify);
     ss >> boolalpha >> doRectify;
@@ -102,5 +104,9 @@ void StereoSlamNode::GrabStereo(const ImageMsg::SharedPtr msgLeft, const ImageMs
         
         Tcw = m_SLAM->TrackRGBD(cv_ptrLeft->image, cv_ptrRight->image, msgLeft->header.stamp.sec);
     
+    }
+
+    if (!Tcw.empty()) {
+        publisher->PublishVIO(Tcw, msgLeft->header.stamp);
     }
 }

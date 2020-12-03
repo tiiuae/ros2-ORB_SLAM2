@@ -26,8 +26,10 @@ find_package(cv_bridge REQUIRED)
 find_package(message_filters REQUIRED)
 find_package(Eigen3 3.1.0 REQUIRED)
 find_package(Pangolin REQUIRED)
+find_package(tf2_ros)
 
 include_directories(
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/publishers
   ${EIGEN3_INCLUDE_DIR}
   ${ORB_SLAM_DIR}
   ${ORB_SLAM_DIR}/include/
@@ -47,28 +49,31 @@ add_custom_target(
 add_executable(mono 
   src/monocular/mono.cpp
   src/monocular/monocular-slam-node.cpp
+  src/publishers/vio_publisher.cpp
 )
 
 add_dependencies(mono orb_slam)
-ament_target_dependencies(mono rclcpp sensor_msgs cv_bridge Pangolin)
+ament_target_dependencies(mono rclcpp sensor_msgs cv_bridge Pangolin tf2_ros)
 target_link_libraries(mono ${ORB_SLAM} ${G2O})
 
 add_executable(rgbd 
   src/rgbd/rgbd.cpp
   src/rgbd/rgbd-slam-node.cpp
+  src/publishers/vio_publisher.cpp
 )
 
 add_dependencies(rgbd orb_slam)
-ament_target_dependencies(rgbd rclcpp sensor_msgs cv_bridge message_filters Pangolin)
+ament_target_dependencies(rgbd rclcpp sensor_msgs cv_bridge message_filters Pangolin tf2_ros)
 target_link_libraries(rgbd ${ORB_SLAM} ${G2O})
 
 add_executable(stereo 
   src/stereo/stereo.cpp
   src/stereo/stereo-slam-node.cpp
+  src/publishers/vio_publisher.cpp
 )
 
 add_dependencies(stereo orb_slam)
-ament_target_dependencies(stereo rclcpp sensor_msgs cv_bridge message_filters Pangolin)
+ament_target_dependencies(stereo rclcpp sensor_msgs cv_bridge message_filters Pangolin tf2_ros)
 target_link_libraries(stereo ${ORB_SLAM} ${G2O})
 
 install(TARGETS mono rgbd stereo

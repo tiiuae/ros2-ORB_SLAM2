@@ -6,7 +6,7 @@ using std::placeholders::_1;
 
 MonocularSlamNode::MonocularSlamNode(ORB_SLAM2::System* pSLAM)
 :   Node("orbslam"), 
-    m_SLAM(pSLAM)
+    m_SLAM(pSLAM), publisher(std::make_shared<VIOPublisher>(this))
 {
     m_image_subscriber = this->create_subscription<ImageMsg>(
         "camera",
@@ -37,4 +37,8 @@ void MonocularSlamNode::GrabImage(const ImageMsg::SharedPtr msg)
     }
     
     cv::Mat Tcw = m_SLAM->TrackMonocular(m_cvImPtr->image, msg->header.stamp.sec);
+
+    if (!Tcw.empty()) {
+        publisher->PublishVIO(Tcw, msg->header.stamp);
+    }
 }

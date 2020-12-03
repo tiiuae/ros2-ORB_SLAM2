@@ -12,6 +12,8 @@
 #include "Map.h"
 #include "Tracking.h"
 
+#include "../publishers/vio_publisher.hpp"
+
 namespace ORB_SLAM2 = ORB_SLAM3;
 
 class MonocularSlamNode : public rclcpp::Node
@@ -31,6 +33,7 @@ private:
     cv_bridge::CvImagePtr m_cvImPtr;
 
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr m_image_subscriber;
+    std::shared_ptr<VIOPublisher> publisher;
 };
 
 #endif
