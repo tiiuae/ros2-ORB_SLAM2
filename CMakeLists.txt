@@ -22,7 +22,9 @@ add_subdirectory(ORB_SLAM3)
 
 include_directories(
         ${EIGEN3_INCLUDE_DIR}
-        ${ORB_SLAM3_INCLUDE_DIRS}
+        ORB_SLAM3
+        ORB_SLAM3/include
+        ORB_SLAM3/include/CameraModels
 )
 
 
@@ -41,6 +43,10 @@ target_link_libraries(ros_mono ORB_SLAM3 )
 #target_link_libraries(ros_mono_inertial ORB_SLAM3_LIBRARIES)
 
 install(TARGETS ros_mono DESTINATION lib/${PROJECT_NAME} )
+install(TARGETS ORB_SLAM3 DESTINATION lib/${PROJECT_NAME} )
+install(TARGETS ORB_SLAM3 DESTINATION lib/${PROJECT_NAME} )
+
+
 install(DIRECTORY ORB_SLAM3/Vocabulary
         DESTINATION share/${PROJECT_NAME})
 

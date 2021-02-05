@@ -1,3 +1,5 @@
+debian/
+obj-x86*/
 # Prerequisites
 *.d
 

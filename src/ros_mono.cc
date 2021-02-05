@@ -19,7 +19,7 @@
  * ORB-SLAM3. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <ORB_SLAM3/System.h>
+#include <System.h>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/core/core.hpp>
 #include <cv_bridge/cv_bridge.h>
