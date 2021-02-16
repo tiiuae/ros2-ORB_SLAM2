@@ -15,7 +15,9 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
-find_package(message_filters REQUIRED)
+#find_package(message_filters REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
 find_package(Eigen3 3.1.0 REQUIRED)
 
 add_subdirectory(ORB_SLAM3)
@@ -27,25 +29,23 @@ include_directories(
         ORB_SLAM3/include/CameraModels
 )
 
-
 add_executable(ros_mono
         src/ros_mono.cc
         )
 
-#add_executable(ros_mono_inertial
-#        src/ros_mono_inertial.cc
-#        )
+add_executable(ros_mono_inertial
+        src/ros_mono_inertial.cc
+        )
 
-ament_target_dependencies(ros_mono rclcpp sensor_msgs cv_bridge)
+ament_target_dependencies(ros_mono rclcpp sensor_msgs cv_bridge tf2 tf2_ros)
 target_link_libraries(ros_mono ORB_SLAM3 )
 
-#ament_target_dependencies(ros_mono_inertial rclcpp sensor_msgs cv_bridge)
-#target_link_libraries(ros_mono_inertial ORB_SLAM3_LIBRARIES)
+ament_target_dependencies(ros_mono_inertial rclcpp sensor_msgs cv_bridge tf2 tf2_ros)
+target_link_libraries(ros_mono_inertial ORB_SLAM3)
 
 install(TARGETS ros_mono DESTINATION lib/${PROJECT_NAME} )
 install(TARGETS ORB_SLAM3 DESTINATION lib/${PROJECT_NAME} )
 install(TARGETS ORB_SLAM3 DESTINATION lib/${PROJECT_NAME} )
-
 
 install(DIRECTORY ORB_SLAM3/Vocabulary
         DESTINATION share/${PROJECT_NAME})
