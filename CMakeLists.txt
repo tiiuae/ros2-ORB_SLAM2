@@ -15,10 +15,10 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
-#find_package(message_filters REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(Eigen3 3.1.0 REQUIRED)
+find_package(orocos_kdl REQUIRED)
 
 add_subdirectory(ORB_SLAM3)
 
@@ -38,12 +38,13 @@ add_executable(ros_mono_inertial
         )
 
 ament_target_dependencies(ros_mono rclcpp sensor_msgs cv_bridge tf2 tf2_ros)
-target_link_libraries(ros_mono ORB_SLAM3 )
+target_link_libraries(ros_mono ORB_SLAM3 ${OROCOS_KDL})
 
 ament_target_dependencies(ros_mono_inertial rclcpp sensor_msgs cv_bridge tf2 tf2_ros)
-target_link_libraries(ros_mono_inertial ORB_SLAM3)
+target_link_libraries(ros_mono_inertial ORB_SLAM3 ${OROCOS_KDL})
 
 install(TARGETS ros_mono DESTINATION lib/${PROJECT_NAME} )
+install(TARGETS ros_mono_inertial DESTINATION lib/${PROJECT_NAME} )
 install(TARGETS ORB_SLAM3 DESTINATION lib/${PROJECT_NAME} )
 install(TARGETS ORB_SLAM3 DESTINATION lib/${PROJECT_NAME} )
 

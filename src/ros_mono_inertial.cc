@@ -45,14 +45,24 @@ class MonoInertialSlamNode : public rclcpp::Node
     using ImageMsg = sensor_msgs::msg::Image;
     using ImuMsg = sensor_msgs::msg::Imu;
 
-    MonoInertialSlamNode(ORB_SLAM3::System* pSLAM,
-                         std::string image_topic = "/camera/image",
-                         std::string imu_topic = "/imu")
-        : Node("orbslam"), m_SLAM(pSLAM)
+    MonoInertialSlamNode(ORB_SLAM3::System* slam) : Node("orbslam"), slam_(slam)
     {
         std::cout << " ============== MonoInertialSlamNode ============" << std::endl;
-        rclcpp::QoS qosImg = rclcpp::QoS(100).best_effort();
-        rclcpp::QoS qosImu = rclcpp::QoS(1000).best_effort();
+        rclcpp::QoS qosImg = rclcpp::QoS(10).best_effort();
+        rclcpp::QoS qosImu = rclcpp::QoS(100).best_effort();
+
+        declare_parameter<string>("image_topic", "/camera/image");
+        declare_parameter<string>("imu_topic", "/imu");
+        declare_parameter<string>("camera_frame_id", "base_link");
+        declare_parameter<string>("map_frame_id", "map");
+
+        const std::string image_topic = get_parameter("image_topic").as_string();
+        const std::string imu_topic = get_parameter("imu_topic").as_string();
+        const std::string camera_frame_id = get_parameter("camera_frame_id").as_string();
+        const std::string map_frame_id = get_parameter("map_frame_id").as_string();
+
+        std::cout << "Listening to images from topic '" << image_topic << "'" << std::endl;
+        std::cout << "Listening to imu from topic '" << imu_topic << "'" << std::endl;
 
         // Maximum delay, 5 seconds
         image_subscriber_ = this->create_subscription<ImageMsg>(
@@ -62,8 +72,8 @@ class MonoInertialSlamNode : public rclcpp::Node
 
         tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
         transformStamped_.header.stamp = now();
-        transformStamped_.header.frame_id = "map";
-        transformStamped_.child_frame_id = "base_link";
+        transformStamped_.header.frame_id = map_frame_id;
+        transformStamped_.child_frame_id = camera_frame_id;
         transformStamped_.transform.translation.x = 0.;
         transformStamped_.transform.translation.y = 0.;
         transformStamped_.transform.translation.z = 0.;
@@ -71,48 +81,61 @@ class MonoInertialSlamNode : public rclcpp::Node
         transformStamped_.transform.rotation.y = 0.0;
         transformStamped_.transform.rotation.z = 0.0;
         transformStamped_.transform.rotation.w = 1.0;
-        // send temporary transform
-        tf_broadcaster_->sendTransform(transformStamped_);
 
-        sync_thread_running = true;
-        sync_thread = std::make_unique<std::thread>(&MonoInertialSlamNode::SyncWithImu, this);
+        // send temporary transform
+        // tf_broadcaster_->sendTransform(transformStamped_);
+
+        sync_thread_running_ = true;
+        sync_thread_ = std::make_unique<std::thread>(&MonoInertialSlamNode::SyncWithImu, this);
     }
 
     ~MonoInertialSlamNode()
     {
-        sync_thread_running = false;
-        sync_thread->join();
+        sync_thread_running_ = false;
+        sync_thread_->join();
 
         // Stop all threads
-        m_SLAM->Shutdown();
+        slam_->Shutdown();
 
         // Save camera trajectory
-        m_SLAM->SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
+        slam_->SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
     }
 
   private:
     std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
-    ORB_SLAM3::System* m_SLAM;
+    ORB_SLAM3::System* slam_;
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_subscriber_;
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_subscriber_;
 
     geometry_msgs::msg::TransformStamped transformStamped_;
-    queue<ImuMsg::ConstSharedPtr> imuBuf;
-    std::mutex mImgMutex, mImuMutex;
-    queue<ImageMsg::ConstSharedPtr> img0Buf;
-    std::atomic_bool sync_thread_running;
-    std::unique_ptr<std::thread> sync_thread;
+    queue<ImuMsg::ConstSharedPtr> imu_buf_;
+    queue<ImageMsg::ConstSharedPtr> img0_buf_;
 
-    const bool mbClahe = false;
-    cv::Ptr<cv::CLAHE> mClahe = cv::createCLAHE(3.0, cv::Size(8, 8));
+    std::mutex img_mutex_, imu_mutex_;
+
+    std::atomic_bool sync_thread_running_;
+    std::unique_ptr<std::thread> sync_thread_;
+
+    const bool clahe_flag_ = false;
+    cv::Ptr<cv::CLAHE> clahe_ = cv::createCLAHE(3.0, cv::Size(8, 8));
+
+    void GrabImu(ImuMsg::ConstSharedPtr imu_msg)
+    {
+        // std::cout << "MonoInertialSlamNode::GrabImu(" << imu_msg->header.frame_id << ")" << std::endl;
+        imu_mutex_.lock();
+        imu_buf_.push(imu_msg);
+        imu_mutex_.unlock();
+        return;
+    }
 
     void GrabImage(ImageMsg::ConstSharedPtr img_msg)
     {
-        mImgMutex.lock();
-        if (!img0Buf.empty())
-            img0Buf.pop();
-        img0Buf.push(img_msg);
-        mImgMutex.unlock();
+        std::cout << "MonoInertialSlamNode::GrabImage(" << img_msg->width << "x" << img_msg->height << ")" << std::endl;
+        img_mutex_.lock();
+        if (!img0_buf_.empty())
+            img0_buf_.pop();
+        img0_buf_.push(img_msg);
+        img_mutex_.unlock();
     }
 
     cv::Mat GetImage(const ImageMsg::ConstSharedPtr& img_msg)
@@ -141,46 +164,46 @@ class MonoInertialSlamNode : public rclcpp::Node
 
     void SyncWithImu()
     {
-        while (sync_thread_running)
+        while (sync_thread_running_)
         {
             cv::Mat im;
             double tIm = 0;
-            if (!img0Buf.empty() && !imuBuf.empty())
+            if (!img0_buf_.empty() && !imu_buf_.empty())
             {
-                tIm = img0Buf.front()->header.stamp.sec;
-                if (tIm > imuBuf.back()->header.stamp.sec)
+                tIm = img0_buf_.front()->header.stamp.sec;
+                if (tIm > imu_buf_.back()->header.stamp.sec)
                     continue;
                 {
-                    mImgMutex.lock();
-                    im = GetImage(img0Buf.front());
-                    img0Buf.pop();
-                    mImgMutex.unlock();
+                    img_mutex_.lock();
+                    im = GetImage(img0_buf_.front());
+                    img0_buf_.pop();
+                    img_mutex_.unlock();
                 }
 
                 vector<ORB_SLAM3::IMU::Point> vImuMeas;
-                mImuMutex.lock();
-                if (!imuBuf.empty())
+                imu_mutex_.lock();
+                if (!imu_buf_.empty())
                 {
                     // Load imu measurements from buffer
                     vImuMeas.clear();
-                    while (!imuBuf.empty() && imuBuf.front()->header.stamp.sec <= tIm)
+                    while (!imu_buf_.empty() && imu_buf_.front()->header.stamp.sec <= tIm)
                     {
-                        double t = imuBuf.front()->header.stamp.sec;
-                        cv::Point3f acc(imuBuf.front()->linear_acceleration.x,
-                                        imuBuf.front()->linear_acceleration.y,
-                                        imuBuf.front()->linear_acceleration.z);
-                        cv::Point3f gyr(imuBuf.front()->angular_velocity.x,
-                                        imuBuf.front()->angular_velocity.y,
-                                        imuBuf.front()->angular_velocity.z);
-                        vImuMeas.push_back(ORB_SLAM3::IMU::Point(acc, gyr, t));
-                        imuBuf.pop();
+                        double t = imu_buf_.front()->header.stamp.sec;
+                        cv::Point3f acc(imu_buf_.front()->linear_acceleration.x,
+                                        imu_buf_.front()->linear_acceleration.y,
+                                        imu_buf_.front()->linear_acceleration.z);
+                        cv::Point3f gyr(imu_buf_.front()->angular_velocity.x,
+                                        imu_buf_.front()->angular_velocity.y,
+                                        imu_buf_.front()->angular_velocity.z);
+                        vImuMeas.emplace_back(ORB_SLAM3::IMU::Point(acc, gyr, t));
+                        imu_buf_.pop();
                     }
                 }
-                mImuMutex.unlock();
-                if (mbClahe)
-                    mClahe->apply(im, im);
+                imu_mutex_.unlock();
+                if (clahe_flag_)
+                    clahe_->apply(im, im);
 
-                cv::Mat Tcw = m_SLAM->TrackMonocular(im, tIm, vImuMeas);
+                cv::Mat Tcw = slam_->TrackMonocular(im, tIm, vImuMeas);
                 std::cout << Tcw << std::endl;
 
                 transformStamped_.header.stamp = now();
@@ -207,26 +230,30 @@ class MonoInertialSlamNode : public rclcpp::Node
                     transformStamped_.transform.rotation.y = tf2_quat.y();
                     transformStamped_.transform.rotation.z = tf2_quat.z();
                     transformStamped_.transform.rotation.w = tf2_quat.w();
-                    tf_broadcaster_->sendTransform(transformStamped_);
+                    const bool is_translation_valid = (!isnan(transformStamped_.transform.translation.x)) &&
+                                                      (!isnan(transformStamped_.transform.translation.y)) &&
+                                                      (!isnan(transformStamped_.transform.translation.z));
+
+                    const bool is_rotation_valid = (!isnan(transformStamped_.transform.rotation.x)) &&
+                                                   (!isnan(transformStamped_.transform.rotation.y)) &&
+                                                   (!isnan(transformStamped_.transform.rotation.z)) &&
+                                                   (!isnan(transformStamped_.transform.rotation.w));
+
+                    if (is_translation_valid && is_rotation_valid)
+                    {
+                        tf_broadcaster_->sendTransform(transformStamped_);
+                    }
                 }
                 else
                 {
                     // continue sending previous transform
-                    tf_broadcaster_->sendTransform(transformStamped_);
+                    // tf_broadcaster_->sendTransform(transformStamped_);
                 }
             }
 
             std::chrono::milliseconds tSleep(1);
             std::this_thread::sleep_for(tSleep);
         }
-    }
-
-    void GrabImu(ImuMsg::ConstSharedPtr imu_msg)
-    {
-        mImuMutex.lock();
-        imuBuf.push(imu_msg);
-        mImuMutex.unlock();
-        return;
     }
 };
 
@@ -238,22 +265,18 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    std::string topic_name = "/camera/image";
-
-    std::cout << "Listening to '" << topic_name << "' topic" << std::endl;
-
     rclcpp::init(argc, argv);
 
     // Create SLAM system. It initializes all system threads and gets ready to
     // process frames.
     std::cout << "IMU SLAM Initialization" << std::endl;
-    ORB_SLAM3::System SLAM(argv[1], argv[2], ORB_SLAM3::System::IMU_MONOCULAR);
+    ORB_SLAM3::System slam(argv[1], argv[2], ORB_SLAM3::System::IMU_MONOCULAR);
     std::cout << "Node Initialization" << std::endl;
 
-    auto node = std::make_shared<MonoInertialSlamNode>(&SLAM, topic_name);
+    auto node = std::make_shared<MonoInertialSlamNode>(&slam);
 
 #ifdef VALGRIND_CHECK
-    for (std::size_t i = 0; i < 10000; i++)
+    for (std::size_t i = 0; i < 100000; i++)
     {
         rclcpp::spin_some(node);
     }
